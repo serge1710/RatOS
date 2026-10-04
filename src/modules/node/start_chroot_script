@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # Source error handling, leave this in place
-set -xe
+set -euxo pipefail
 
 # Source CustomPIOS common.sh
 source /common.sh
@@ -11,9 +11,9 @@ if [[ ! -d /tmp ]]; then
 	mkdir /tmp
 fi
 
-chmod 777 /tmp
+chmod 1777 /tmp
 
-curl -fsSL https://deb.nodesource.com/setup_18.x | bash - &&\
+curl -fsSL https://deb.nodesource.com/setup_24.x | bash - &&\
 apt update && apt install nodejs -y 
 
 npm install -g pnpm
