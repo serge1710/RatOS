@@ -55,7 +55,7 @@ MN_CHROOT_INSTALL_SH="$(mktemp ./scripts/.ratos-install.XXXXXX.sh)"
 # Remove only the top-level non-root guard call from a temporary installer.
 # Keep its directory unchanged: upstream derives SRCDIR from BASH_SOURCE.
 sed '/^verify_ready$/d' "${MN_BUILD_INSTALL_SH}" > "${MN_CHROOT_INSTALL_SH}"
-if env HOME="/home/${BASE_USER}" USER="${BASE_USER}" LOGNAME="${BASE_USER}" \
+if env PIP_NO_CACHE_DIR=1 HOME="/home/${BASE_USER}" USER="${BASE_USER}" LOGNAME="${BASE_USER}" \
     bash "${MN_CHROOT_INSTALL_SH}" -z -x -s; then
     rm -f "${MN_CHROOT_INSTALL_SH}"
 else

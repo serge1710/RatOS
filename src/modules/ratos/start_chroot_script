@@ -70,11 +70,12 @@ check_install_pkgs ${RATOS_DEPS}
 
 
 # Install RatOS Configurator
-sudo -u "${BASE_USER}" bash /home/"${BASE_USER}"/ratos-configurator/scripts/setup.sh
+bash /usr/local/lib/ratos/setup-configurator-chroot.sh \
+    "/home/${BASE_USER}/ratos-configurator" "${BASE_USER}"
 
 # Start the configurator so extensions can access the API
 echo "Starting RatOS Configurator"
-pushd "/home/${BASE_USER}/ratos-configurator"
+pushd "/home/${BASE_USER}/ratos-configurator/app"
 sudo -u "${BASE_USER}" npm run start &
 # Wait for configurator to start
 # shellcheck disable=SC2016
@@ -86,7 +87,21 @@ echo $PATH
 ls -la /usr/local/bin
 
 # Install RatOS Configuration
-sudo -u "${BASE_USER}" /home/"${BASE_USER}"/printer_data/config/RatOS/scripts/ratos-install.sh
+# The v2.1.3 setup links RatOS to the monorepo's embedded configuration.
+# Run privileged installation as root and map the renamed Trixie OpenBLAS package.
+RATOS_INSTALL="/home/${BASE_USER}/ratos-configurator/configuration/scripts/ratos-install.sh"
+RATOS_BUILD_INSTALL="$(mktemp "$(dirname "${RATOS_INSTALL}")/.ratos-install.XXXXXX.sh")"
+sed '/source.*ratos-common.sh/a PKGLIST="${PKGLIST//libopenblas-base/libopenblas0}"' \
+    "${RATOS_INSTALL}" > "${RATOS_BUILD_INSTALL}"
+if env SUDO_USER="${BASE_USER}" HOME="/home/${BASE_USER}" USER="${BASE_USER}" \
+    RATOS_USERNAME="${BASE_USER}" RATOS_USERGROUP="${BASE_USER}" \
+    bash "${RATOS_BUILD_INSTALL}"; then
+    rm -f "${RATOS_BUILD_INSTALL}"
+else
+    RATOS_INSTALL_STATUS=$?
+    rm -f "${RATOS_BUILD_INSTALL}"
+    exit "${RATOS_INSTALL_STATUS}"
+fi
 
 # Create variant file
 echo "${BASE_DISTRO}" > /etc/"${BASE_DISTRO}"-variant
