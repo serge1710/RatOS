@@ -42,11 +42,26 @@ check_install_pkgs ${IS_REQ_PREINSTALL_DEPS}
 ### Check for Klipper Venv installed.
 pushd "/home/${BASE_USER}" &> /dev/null || exit 1
 if [[ -d "${IS_REQ_PREINSTALL_VENV_DIR}" ]] && [[ -x "${IS_REQ_PREINSTALL_VENV_DIR}/bin/pip" ]]; then
-    echo_green "Installing numpy..."
-    sudo -u "${BASE_USER}" "${IS_REQ_PREINSTALL_VENV_DIR}"/bin/pip install -v "${IS_REQ_PREINSTALL_PIP}"
+    if [[ -n "${IS_REQ_PREINSTALL_PIP//[[:space:]]/}" ]]; then
+        echo_green "Installing configured Python requirements..."
+        read -r -a pip_requirements <<< "${IS_REQ_PREINSTALL_PIP}"
+        sudo -u "${BASE_USER}" "${IS_REQ_PREINSTALL_VENV_DIR}"/bin/pip install -v "${pip_requirements[@]}"
+    else
+        # The Trixie configuration installs numpy/matplotlib through APT.
+        # Make those distro packages visible inside Klipper's existing venv.
+        echo_green "Using system Python packages for Input Shaper..."
+        venv_config="${IS_REQ_PREINSTALL_VENV_DIR}/pyvenv.cfg"
+        test -f "${venv_config}"
+        if grep -q '^include-system-site-packages[[:space:]]*=' "${venv_config}"; then
+            sed -i 's/^include-system-site-packages[[:space:]]*=.*/include-system-site-packages = true/' "${venv_config}"
+        else
+            printf '%s\\n' 'include-system-site-packages = true' >> "${venv_config}"
+        fi
+    fi
+    sudo -u "${BASE_USER}" "${IS_REQ_PREINSTALL_VENV_DIR}/bin/python" -c 'import numpy; import matplotlib'
 else
     echo_red "Klipper Venv not found!"
-    return 1
+    exit 1
 fi
 
 ## Cleanup

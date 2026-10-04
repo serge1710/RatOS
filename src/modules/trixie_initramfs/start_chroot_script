@@ -3,6 +3,8 @@ set -e
 source /common.sh
 install_cleanup_trap
 
+chmod 1777 /tmp
+
 # Read the target image's release, never the build host's release.
 source /etc/os-release
 if [[ "${VERSION_CODENAME:-}" == trixie ]]; then

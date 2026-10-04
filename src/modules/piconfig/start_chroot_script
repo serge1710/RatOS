@@ -31,6 +31,9 @@ fi
 # Step 1: Copy msos_config.txt
 echo_green "Copying temporary file ..."
 unpack /filesystem/tmp /tmp root
+# CustomPiOS unpack preserves the source directory mode on the destination.
+# APT's unprivileged verifier needs the standard writable sticky /tmp.
+chmod 1777 /tmp
 
 if [[ ! -f /tmp/msos_config.txt ]]; then
     echo_red "Missing required file: /tmp/msos_config.txt"

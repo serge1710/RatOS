@@ -16,7 +16,7 @@ jobs:
       version: ${{ steps.current-version.outputs.version }}
     steps:
       - name: "RatOS: Clone Repository"
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7.0.1
         with:
           token: ${{ secrets.PAT }}
           persist-credentials: true
@@ -36,7 +36,7 @@ jobs:
           echo ${{ github.event.inputs.version }} > ./src/version
 
       - name: "RatOS: git add & commit & tag & push"
-        uses: EndBug/add-and-commit@v9
+        uses: EndBug/add-and-commit@v11.1.1
         with:
           add: "./src/version"
           default_author: github_actions
@@ -53,7 +53,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: "RatOS-configurator: Clone Deployment Repository"
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7.0.1
         with:
           token: ${{ secrets.PAT }}
           repository: sergelhr/RatOS-configurator
@@ -61,7 +61,7 @@ jobs:
           ref: "v2.1.x-deployment-2"
 
       - name: "RatOS Configurator: git add & commit & tag & push"
-        uses: EndBug/add-and-commit@v9
+        uses: EndBug/add-and-commit@v11.1.1
         with:
           default_author: github_actions
           commit: --allow-empty
@@ -77,7 +77,7 @@ jobs:
     if: needs.ratos-push-version-number.outputs.version != github.event.inputs.version
     steps:
       - name: "RatOS-configuration: Clone Repository"
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7.0.1
         with:
           token: ${{ secrets.PAT }}
           repository: Rat-OS/RatOS-configuration
@@ -85,7 +85,7 @@ jobs:
           ref: "v2.1.x"
 
       - name: "RatOS-configuration: git add & commit & tag & push"
-        uses: EndBug/add-and-commit@v9
+        uses: EndBug/add-and-commit@v11.1.1
         with:
           default_author: github_actions
           commit: --allow-empty
@@ -101,7 +101,7 @@ jobs:
     if: needs.ratos-push-version-number.outputs.version != github.event.inputs.version
     steps:
       - name: "RatOS-theme: Clone Repository"
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7.0.1
         with:
           token: ${{ secrets.PAT }}
           repository: Rat-OS/RatOS-theme
@@ -109,7 +109,7 @@ jobs:
           ref: "v2.1.x"
 
       - name: "RatOS-theme: git add & commit & tag & push"
-        uses: EndBug/add-and-commit@v9
+        uses: EndBug/add-and-commit@v11.1.1
         with:
           default_author: github_actions
           commit: --allow-empty
@@ -127,7 +127,7 @@ jobs:
       date: ${{ steps.base-name.outputs.date }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7.0.1
         with:
           ref: "v2.1.x"
           fetch-depth: 0
@@ -139,7 +139,7 @@ jobs:
           echo "TAG_NAME=$(git describe --tags $(git rev-list --tags --max-count=1))" >> $GITHUB_OUTPUT
 
       - name: Generate a changelog
-        uses: orhun/git-cliff-action@v1
+        uses: orhun/git-cliff-action@v4.9.1
         id: changelog
         with:
           config: ./cliff-release.toml
@@ -147,7 +147,7 @@ jobs:
 
       - name: Create empty release
         id: create-release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v3.0.3
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           name: "RatOS-v${{ github.event.inputs.version }}"
@@ -171,7 +171,7 @@ jobs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7.0.1
         with:
           ref: v2.1.x
 
@@ -193,8 +193,11 @@ jobs:
       matrix:
         config: ${{ fromJson(needs.matrix.outputs.matrix) }}
     steps:
+      - name: Checkout build action
+        uses: actions/checkout@v7.0.1
+
       - name: Cache aptitude
-        uses: actions/cache@v2
+        uses: actions/cache@v6.1.0
         with:
           path: repository/src/workspace/aptcache
           key: ${{ runner.os }}-apt-get-${{ hashFiles('**/apt.txt') }}
@@ -203,7 +206,7 @@ jobs:
 
       - name: Build image
         id: build
-        uses: mainsail-crew/MainsailOS-actions/build-image@master
+        uses: ./.github/actions/build-image
         with:
           config: ${{ matrix.config }}
           build-ref: v2.1.x
@@ -211,9 +214,9 @@ jobs:
 
       - name: Upload failed Logfile
         if: failure()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v7.0.1
         with:
-          name: failed-${{ steps.move-image.outputs.image }}.log
+          name: failed-build-${{ github.run_id }}-${{ strategy.job-index }}.log
           path: repository/src/build.log
 
       - name: Rename image file
@@ -241,7 +244,7 @@ jobs:
 
       - name: Upload Compressing Image
         if: success()
-        uses: xresloader/upload-to-github-release@v1
+        uses: xresloader/upload-to-github-release@v1.6.2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
@@ -262,7 +265,7 @@ jobs:
 
       - name: Upload Checksums
         if: success()
-        uses: xresloader/upload-to-github-release@v1
+        uses: xresloader/upload-to-github-release@v1.6.2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
@@ -294,7 +297,7 @@ jobs:
 
       - name: Generate JSON
         id: json
-        uses: actions/github-script@v6
+        uses: actions/github-script@v9.0.0
         env:
           name: "RatOS v${{ github.event.inputs.version }}"
           description: "Type: ${{ steps.build.outputs.type }}, SBC: ${{ steps.build.outputs.sbc }}"
@@ -338,7 +341,7 @@ jobs:
 
       - name: Upload JSON
         if: success()
-        uses: xresloader/upload-to-github-release@v1
+        uses: xresloader/upload-to-github-release@v1.6.2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:

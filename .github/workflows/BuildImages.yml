@@ -9,6 +9,7 @@ on:
       - "src/build_dist"
       - "config/**"
       - ".github/workflows/BuildImages.yml"
+      - ".github/actions/**"
       - ".github/workflow_config.yml"
       - ".github/scripts/setup_matrix.py"
     tags-ignore:
@@ -19,6 +20,7 @@ on:
       - "src/**"
       - "config/**"
       - ".github/workflows/BuildImages.yml"
+      - ".github/actions/**"
       - ".github/scripts/setup_matrix.py"
       - ".github/workflow_config.yml"
 
@@ -36,7 +38,7 @@ jobs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7.0.1
 
       - name: Create Matrix
         id: set-matrix
@@ -54,8 +56,11 @@ jobs:
       matrix:
         config: ${{ fromJson(needs.setup.outputs.matrix) }}
     steps:
+      - name: Checkout build action
+        uses: actions/checkout@v7.0.1
+
       - name: Cache aptitude
-        uses: actions/cache@v3
+        uses: actions/cache@v6.1.0
         with:
           path: repository/src/workspace/aptcache
           key: ${{ matrix.config }}-apt-get-${{ hashFiles('**/apt.txt') }}
@@ -64,7 +69,7 @@ jobs:
 
       - name: Build image
         id: build
-        uses: mainsail-crew/MainsailOS-actions/build-image@master
+        uses: ./.github/actions/build-image
         with:
           config: ${{ matrix.config }}
           custompios-ref: 1.5.0
@@ -88,9 +93,9 @@ jobs:
 
       - name: Upload failed Logfile
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7.0.1
         with:
-          name: failed-${{ steps.move-image.outputs.image }}.log
+          name: failed-build-${{ github.run_id }}-${{ strategy.job-index }}.log
           path: repository/src/build.log
 
       - name: Compressing Image
@@ -107,19 +112,19 @@ jobs:
           sha256sum ${{ steps.move-image.outputs.image }}.img.xz > ${{ steps.move-image.outputs.image }}.img.xz.sha256
 
       - name: Upload Compressed Image
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7.0.1
         with:
           name: ${{ steps.move-image.outputs.image }}.img.xz
           path: ${{ steps.move-image.outputs.image }}.img.xz
 
       - name: Upload Compressed Image Checksum
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7.0.1
         with:
           name: ${{ steps.move-image.outputs.image }}.img.xz.sha256
           path: ${{ steps.move-image.outputs.image }}.img.xz.sha256
 
       - name: Upload Image Checksum
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7.0.1
         with:
           name: ${{ steps.move-image.outputs.image }}.img.sha256
           path: ${{ steps.move-image.outputs.image }}.img.sha256
