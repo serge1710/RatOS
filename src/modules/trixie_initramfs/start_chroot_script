@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+set -e
+source /common.sh
+install_cleanup_trap
+
+# Read the target image's release, never the build host's release.
+source /etc/os-release
+if [[ "${VERSION_CODENAME:-}" == trixie ]]; then
+    # MODULES=dep probes the running host; it is unsuitable for an ARM image
+    # generated under QEMU on an x86 runner. Include target modules instead.
+    test -f /etc/initramfs-tools/initramfs.conf
+    install -d -m 0755 /etc/initramfs-tools/conf.d
+    printf '%s\n' 'MODULES=most' > /etc/initramfs-tools/conf.d/zz-ratos-build
+fi
