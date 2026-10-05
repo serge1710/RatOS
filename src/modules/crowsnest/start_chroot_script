@@ -23,7 +23,9 @@ CN_BUILD_PACKAGE_FILE="/tmp/cn_packages.lst"
 
 # Helper Func
 is_raspbian() {
-    if [[ -f /boot/config.txt ]] && [[ -f /etc/rpi-issue ]]; then
+    # Raspberry Pi OS moved config.txt to /boot/firmware on Bookworm/Trixie.
+    # Identify the OS independently of its boot mount path or host hardware.
+    if [[ -f /etc/rpi-issue ]]; then
         echo "1"
     else
         echo "0"
