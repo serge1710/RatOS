@@ -91,7 +91,10 @@ ls -la /usr/local/bin
 # Run privileged installation as root and map the renamed Trixie OpenBLAS package.
 RATOS_INSTALL="/home/${BASE_USER}/ratos-configurator/configuration/scripts/ratos-install.sh"
 RATOS_BUILD_INSTALL="$(mktemp "$(dirname "${RATOS_INSTALL}")/.ratos-install.XXXXXX.sh")"
-sed '/source.*ratos-common.sh/a PKGLIST="${PKGLIST//libopenblas-base/libopenblas0}"' \
+# The image's target account may still have nologin until first boot.
+# Force Bash only for upstream su calls in this temporary build installer.
+sed -e '/source.*ratos-common.sh/a PKGLIST="${PKGLIST//libopenblas-base/libopenblas0}"' \
+    -e '/source.*ratos-common.sh/a su() { command su --shell /bin/bash "$@"; }' \
     "${RATOS_INSTALL}" > "${RATOS_BUILD_INSTALL}"
 if env SUDO_USER="${BASE_USER}" HOME="/home/${BASE_USER}" USER="${BASE_USER}" \
     RATOS_USERNAME="${BASE_USER}" RATOS_USERGROUP="${BASE_USER}" \
