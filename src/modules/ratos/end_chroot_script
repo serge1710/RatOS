@@ -7,7 +7,39 @@
 # Source error handling, leave this in place
 set -xe
 
-sudo -u "${BASE_USER}" /home/"${BASE_USER}"/printer_data/config/RatOS/scripts/ratos-post-install.sh
+# Service configuration must run as root: setuid sudo cannot escalate in
+# the image's nosuid chroot. Keep extension symlinking under the target user.
+if [[ -f /usr/lib/systemd/system/ModemManager.service ||
+      -f /lib/systemd/system/ModemManager.service ||
+      -f /etc/systemd/system/ModemManager.service ]]; then
+    systemctl disable ModemManager.service
+fi
+systemctl mask ModemManager.service
+
+KS_SERVICE=/etc/systemd/system/KlipperScreen.service
+if [[ -f "${KS_SERVICE}" ]]; then
+    sed -i -e 's/^RestartSec=1$/RestartSec=5/' \
+        -e 's/^StartLimitIntervalSec=0$/StartLimitIntervalSec=100\nStartLimitBurst=4/' \
+        "${KS_SERVICE}"
+fi
+
+POST_INSTALL="/home/${BASE_USER}/printer_data/config/RatOS/scripts/ratos-post-install.sh"
+POST_BUILD="$(mktemp "$(dirname "${POST_INSTALL}")/.ratos-post-build.XXXXXX.sh")"
+# Skip only the two privileged calls already handled above, preserving the
+# upstream user guard and symlink_extensions failure handling.
+sed -e '/^disable_modem_manager[[:space:]]*$/d' \
+    -e '/^patch_klipperscreen_service_restarts[[:space:]]*$/d' \
+    "${POST_INSTALL}" > "${POST_BUILD}"
+bash -n "${POST_BUILD}"
+chmod 0644 "${POST_BUILD}"
+if sudo -u "${BASE_USER}" env HOME="/home/${BASE_USER}" \
+    USER="${BASE_USER}" LOGNAME="${BASE_USER}" bash "${POST_BUILD}"; then
+    rm -f "${POST_BUILD}"
+else
+    POST_STATUS=$?
+    rm -f "${POST_BUILD}"
+    exit "${POST_STATUS}"
+fi
 
 # Stop the configurator, curl will fail so disable exit on error
 set +e
