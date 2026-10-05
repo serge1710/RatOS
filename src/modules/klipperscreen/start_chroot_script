@@ -1,28 +1,59 @@
 #!/usr/bin/env bash
-# Installs RatOS
+# Install KlipperScreen while building a CustomPiOS image as root.
 # GPL V3
-########
-
-
-# Source error handling, leave this in place
-set -x
-set -e
+set -Ee
 
 source /common.sh
 install_cleanup_trap
 
-# Add root rights to X11
-echo_green "Adding root rights to X11.."
-echo needs_root_rights=yes>>/etc/X11/Xwrapper.config
+: "${BASE_USER:?BASE_USER is not set}"
+KS_HOME="/home/${BASE_USER}"
+KS_DIR="${KS_HOME}/KlipperScreen"
+KS_VENV="${KS_HOME}/.KlipperScreen-env"
 
-echo_green "Installing KlipperScreen"
-
-cd /home/pi
+echo_green "Installing KlipperScreen ..."
+cd "${KS_HOME}"
 gitclone KLIPPERSCREEN KlipperScreen
-cd /home/pi/KlipperScreen
-sudo -u "${BASE_USER}" NETWORK="skipnetworkmanagerinstall" ./scripts/KlipperScreen-install.sh
+cd "${KS_DIR}"
 
-# Mute output from klipperscreen service
-sudo sed -i 's/\[Service\]/\[Service\]\n\StandardOutput=null\nStandardError=null/g' /etc/systemd/system/KlipperScreen.service
+# The upstream interactive installer runs as a user and calls setuid sudo.
+# That fails on the image builder's nosuid mount. Adapt a temporary copy only;
+# the original installer remains available for normal updates after boot.
+KS_INSTALL="${KS_DIR}/scripts/KlipperScreen-install.sh"
+grep -Fq 'if [ "$EUID" == 0 ]' "${KS_INSTALL}" || {
+    echo_red "KlipperScreen root guard changed; review the chroot adapter."
+    exit 1
+}
+KS_BUILD_INSTALL="$(mktemp "${KS_DIR}/scripts/.KlipperScreen-build.XXXXXX.sh")"
+sed -e '/^if \[ "\$EUID" == 0 \]/,/^fi$/d' \
+    -e '/^[[:space:]]*check_virtual_terminal[[:space:]]*$/d' \
+    -e '1a sudo() { "$@"; }' \
+    "${KS_INSTALL}" > "${KS_BUILD_INSTALL}"
+bash -n "${KS_BUILD_INSTALL}"
 
-sudo systemctl stop KlipperScreen
+# A build chroot has no display/VT. Preserve the target service's VT settings
+# and install chvt explicitly rather than letting host detection disable them.
+check_install_pkgs kbd
+if env HOME="${KS_HOME}" USER="${BASE_USER}" LOGNAME="${BASE_USER}" \
+    KLIPPERSCREEN_VENV="${KS_VENV}" PIP_NO_CACHE_DIR=1 \
+    DEBIAN_FRONTEND=noninteractive SERVICE=Y BACKEND=X START=0 NETWORK=n \
+    bash "${KS_BUILD_INSTALL}" </dev/null; then
+    rm -f "${KS_BUILD_INSTALL}"
+else
+    KS_STATUS=$?
+    rm -f "${KS_BUILD_INSTALL}"
+    exit "${KS_STATUS}"
+fi
+
+chown -R "${BASE_USER}:${BASE_USER}" "${KS_DIR}" "${KS_VENV}" "${KS_HOME}/.local"
+
+# Avoid starting a display server in the build chroot.
+install -d -m 0755 /etc/systemd/system/KlipperScreen.service.d
+cat > /etc/systemd/system/KlipperScreen.service.d/ratos.conf <<'EOF_SERVICE'
+[Service]
+StandardOutput=null
+StandardError=null
+EOF_SERVICE
+
+systemctl_if_exists enable KlipperScreen.service
+echo_green "Installing KlipperScreen ... DONE!"

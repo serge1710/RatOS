@@ -121,7 +121,7 @@ runs:
       shell: bash
       run: |
         cd repository/src/image
-        sha256sum -b ${{ steps.checksum.outputs.FILENAME }}
+        sha256sum --check "${{ steps.checksum.outputs.FILENAME }}"
 
     - name: Update CustomPiOS Paths
       shell: bash
