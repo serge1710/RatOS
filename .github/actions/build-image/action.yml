@@ -123,6 +123,18 @@ runs:
         cd repository/src/image
         sha256sum --check "${{ steps.checksum.outputs.FILENAME }}"
 
+    - name: Adapt CustomPiOS polkit dependencies
+      shell: bash
+      run: |
+        # CustomPiOS 1.5.0 still installs the removed policykit-1 package.
+        # Patch only the checkout; keep its service-suppression lifecycle intact.
+        SCRIPT="CustomPiOS/src/modules/disable-services/start_chroot_script"
+        sed -i \
+          -e 's/is_in_apt policykit-1/is_in_apt polkitd/' \
+          -e 's/apt-get -y install policykit-1/apt-get -y install polkitd pkexec/' \
+          "$SCRIPT"
+        bash -n "$SCRIPT"
+
     - name: Update CustomPiOS Paths
       shell: bash
       run: cd repository/src && ../../CustomPiOS/src/update-custompios-paths

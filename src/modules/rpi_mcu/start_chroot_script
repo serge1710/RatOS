@@ -16,7 +16,9 @@ make olddefconfig
 make clean
 # Reset ownership so make flash doesn't complain
 chown pi:pi -R /home/pi/klipper
-make flash
+# Trust only this target-owned repository for this root build command.
+env GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=safe.directory \
+    GIT_CONFIG_VALUE_0="/home/pi/klipper" make flash
 popd
 
 pushd /home/${BASE_USER}/klipper
