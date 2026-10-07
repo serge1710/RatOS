@@ -86,6 +86,7 @@ runs:
         echo "MODULES=${MODULES}" >> $GITHUB_OUTPUT
 
     - name: Base Image Checksum
+      if: inputs.config != 'raspberry/rpi64'
       id: checksum
       shell: bash
       run: |
@@ -99,6 +100,7 @@ runs:
         echo "FILENAME=${FILENAME}" >> $GITHUB_OUTPUT
 
     - name: Cache Base Source Image
+      if: inputs.config != 'raspberry/rpi64'
       id: cache
       uses: actions/cache@v6.1.0
       with:
@@ -106,18 +108,19 @@ runs:
         key: base-image-${{ steps.checksum.outputs.CHECKSUM }}
 
     - name: Download Base Source Image via Torrent
-      if: steps.cache.outputs.cache-hit != 'true' && endswith(steps.config.outputs.DOWNLOAD_URL_IMAGE, '.torrent')
+      if: inputs.config != 'raspberry/rpi64' && steps.cache.outputs.cache-hit != 'true' && endswith(steps.config.outputs.DOWNLOAD_URL_IMAGE, '.torrent')
       shell: bash
       run: aria2c -d repository/src/image --seed-time=0 ${{ steps.config.outputs.DOWNLOAD_URL_IMAGE }}
 
     - name: Download Base Source Image via wget
-      if: steps.cache.outputs.cache-hit != 'true' && !endswith(steps.config.outputs.DOWNLOAD_URL_IMAGE, '.torrent')
+      if: inputs.config != 'raspberry/rpi64' && steps.cache.outputs.cache-hit != 'true' && !endswith(steps.config.outputs.DOWNLOAD_URL_IMAGE, '.torrent')
       shell: bash
       run: |
         cd repository/src/image
         wget ${{ steps.config.outputs.DOWNLOAD_URL_IMAGE }}
 
     - name: Comparing Checksums
+      if: inputs.config != 'raspberry/rpi64'
       shell: bash
       run: |
         cd repository/src/image
@@ -129,4 +132,11 @@ runs:
 
     - name: Build Image
       shell: bash
-      run: sudo modprobe loop && cd repository/src && sudo bash -x ./build_dist
+      run: |
+        sudo modprobe loop
+        cd repository/src
+        if [[ "${{ inputs.config }}" == "raspberry/rpi64" ]]; then
+          sudo ./build -d -b raspberrypiarm64
+        else
+          sudo bash -x ./build_dist
+        fi

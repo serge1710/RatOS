@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
-# Raspberry Pi OS Lite ARM64, pinned to the 2026-09-15 Trixie release.
+# CustomPiOS 2.0 discovers the current Raspberry Pi OS Lite image.
+# The downloader rejects releases outside Trixie ARM64.
 BASE_BOARD="raspberrypiarm64"
 BASE_ARCH="arm64"
-DOWNLOAD_URL_CHECKSUM="https://downloads.raspberrypi.com/raspios_lite_arm64/images/raspios_lite_arm64-2026-09-15/2026-09-15-raspios-trixie-arm64-lite.img.xz.sha256"
-DOWNLOAD_URL_IMAGE="https://downloads.raspberrypi.com/raspios_lite_arm64/images/raspios_lite_arm64-2026-09-15/2026-09-15-raspios-trixie-arm64-lite.img.xz"
+BASE_OS="debian_trixie"
+BASE_IMAGE_PATH="${DIST_PATH}/image/trixie-arm64"
 
 export BASE_BOARD
 export BASE_ARCH
-export DOWNLOAD_URL_CHECKSUM
-export DOWNLOAD_URL_IMAGE
+export BASE_OS
+export BASE_IMAGE_PATH

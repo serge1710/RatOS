@@ -1,12 +1,53 @@
 #!/usr/bin/env bash
+set -e
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 export DIST_PATH="${DIR}"
+DOWNLOAD_BASE=no
+REQUESTED_BOARD=
+BUILD_ARGS=()
+while getopts ':db:hl:' option; do
+    case "$option" in
+        d) DOWNLOAD_BASE=yes ;;
+        b) REQUESTED_BOARD="$OPTARG" ;;
+        l) BUILD_ARGS+=(-l "$OPTARG") ;;
+        h)
+            echo "Usage: $0 [-d] [-b raspberrypiarm64] [-l logfile] [variant]"
+            echo "  -d  Download and verify the latest Trixie Lite ARM64 base image"
+            exit 0
+            ;;
+        *) echo "Invalid or incomplete build option: -$OPTARG" >&2; exit 2 ;;
+    esac
+done
+shift "$((OPTIND - 1))"
+BUILD_ARGS+=("$@")
 CUSTOM_PI_OS_PATH=$(<"${DIR}"/custompios_path)
 BASE_BOOT_MOUNT_PATH=boot
 export CUSTOM_PI_OS_PATH
 export BASE_BOOT_MOUNT_PATH
 export PATH=$PATH:$CUSTOM_PI_OS_PATH
+
+if [[ "$DOWNLOAD_BASE" == yes ]]; then
+    # Source the assembled RatOS config before loading CustomPiOS defaults.
+    source "${DIST_PATH}/config"
+    if [[ -f "${DIST_PATH}/config.local" ]]; then
+        source "${DIST_PATH}/config.local"
+    fi
+    if [[ -n "$REQUESTED_BOARD" && "$REQUESTED_BOARD" != "$BASE_BOARD" ]]; then
+        echo "Requested board conflicts with the RatOS board config" >&2
+        exit 2
+    fi
+    if [[ "$BASE_BOARD" != raspberrypiarm64 || "$BASE_OS" != debian_trixie ]]; then
+        echo "Automatic downloads currently require Raspberry Pi ARM64 Trixie" >&2
+        exit 2
+    fi
+    if [[ $# -gt 0 && "$1" != default ]]; then
+        echo "Automatic downloads require the default Raspberry Pi variant" >&2
+        exit 2
+    fi
+elif [[ -n "$REQUESTED_BOARD" ]]; then
+    export BASE_BOARD="$REQUESTED_BOARD"
+fi
 
 echo "Installing CustomPiOS dependencies..."
 apt-get install -y --no-install-recommends \
@@ -37,4 +78,11 @@ apt-get install -y --no-install-recommends \
         lsof \
         f2fs-tools
 
-"${CUSTOM_PI_OS_PATH}"/build_custom_os "$@"
+if [[ "$DOWNLOAD_BASE" == yes ]]; then
+    # The upstream Docker `build -d -b` uses this same Python downloader.
+    # Its shell entry point hardcodes /distro and /CustomPiOS; use local paths.
+    export BASE_ZIP_IMG
+    BASE_ZIP_IMG="$(python3 "${DIST_PATH}/download_base_image.py")"
+fi
+
+"${CUSTOM_PI_OS_PATH}"/build_custom_os "${BUILD_ARGS[@]}"

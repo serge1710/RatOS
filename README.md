@@ -47,9 +47,23 @@ for these boards; x64 refers to Intel/AMD systems.
 
 CustomPiOS 2.0 requires Python YAML support (`python3-yaml`) and an explicit
 `BASE_BOARD=raspberrypiarm64` so its generated board config retains ARM64
-emulation. RatOS keeps downloaded images in `src/image` using
+emulation. RatOS keeps Trixie ARM64 images in `src/image/trixie-arm64` using
 `BASE_IMAGE_PATH`; the Raspberry Pi boot partition mounts at `/boot/firmware`.
 The upstream 2.0 polkit fix replaces the former checkout patch.
+
+The Raspberry Pi workflow uses `sudo ./build -d -b raspberrypiarm64` from
+`src`, rather than pinned image URLs. `build` is RatOS's local adapter to the
+CustomPiOS 2.0 downloader: the upstream command with those flags is a Docker
+entry point with fixed `/distro` and `/CustomPiOS` paths. The adapter resolves
+the official latest Lite ARM64 image, rejects any release outside Trixie,
+and uses CustomPiOS's SHA-256 verification and download logic. It does not
+run the Docker wrapper's separate release stage; GitHub Actions retains image
+compression and artifact uploads. Other board configurations keep their
+existing download flow.
+
+For a local Raspberry Pi build, first clone CustomPiOS tag `2.0.0`, then run
+its `src/update-custompios-paths` from RatOS's `src` directory. From the RatOS
+root, run `./build-pi64.sh` to assemble the config and download/build the image.
 
 The intended printer connection is a BTT Manta M8P V2.0 over USB.
 After flashing, select that board in the RatOS configurator and use its

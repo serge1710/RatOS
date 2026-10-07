@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# Local counterpart to the CustomPiOS Docker `build -d -b` command.
+set -e
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+exec "${DIR}/build_dist" "$@"
