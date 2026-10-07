@@ -23,6 +23,8 @@ get_img_name() {
 }
 
 BASE_BOOT_MOUNT_PATH=boot
+# Keep the workflow-managed image directory with CustomPiOS 2.0 board configs.
+BASE_IMAGE_PATH="${DIST_PATH}/image"
 DIST_VERSION="$(get_version)"
 BASE_ZIP_IMG="$(get_img_name)"
 DIST_NAME="RatOS"
@@ -34,6 +36,7 @@ BASE_APT_CLEAN=no
 export DIST_NAME
 export DIST_VERSION
 export BASE_ZIP_IMG
+export BASE_IMAGE_PATH
 export BASE_IMAGE_ENLARGEROOT
 export BASE_IMAGE_RESIZEROOT
 export BASE_BOOT_MOUNT_PATH

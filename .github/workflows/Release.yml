@@ -210,7 +210,7 @@ jobs:
         with:
           config: ${{ matrix.config }}
           build-ref: v2.1.x
-          custompios-ref: 1.5.0
+          custompios-ref: 2.0.0
 
       - name: Upload failed Logfile
         if: failure()

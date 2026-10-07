@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
 # Raspberry Pi OS Lite ARM64, pinned to the 2026-09-15 Trixie release.
+BASE_BOARD="raspberrypiarm64"
 BASE_ARCH="arm64"
 DOWNLOAD_URL_CHECKSUM="https://downloads.raspberrypi.com/raspios_lite_arm64/images/raspios_lite_arm64-2026-09-15/2026-09-15-raspios-trixie-arm64-lite.img.xz.sha256"
 DOWNLOAD_URL_IMAGE="https://downloads.raspberrypi.com/raspios_lite_arm64/images/raspios_lite_arm64-2026-09-15/2026-09-15-raspios-trixie-arm64-lite.img.xz"
 
+export BASE_BOARD
 export BASE_ARCH
 export DOWNLOAD_URL_CHECKSUM
 export DOWNLOAD_URL_IMAGE

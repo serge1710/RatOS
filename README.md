@@ -39,6 +39,23 @@ On each push you make, an image is build and uploaded as an artifact.
 If you want or need to build locally please visit [CustomPiOS](https://github.com/guysoft/CustomPiOS). \
 Especially ["Build a Distro From within Raspbian / Debian / Ubuntu / CustomPiOS Distros"](https://github.com/guysoft/CustomPiOS#build-a-distro-from-within-raspbian--debian--ubuntu--custompios-distros)
 
+### Raspberry Pi 4 / Pi 5 / CM5 build
+
+The build and release matrices use `raspberry/rpi64`: Raspberry Pi OS Lite
+Trixie ARM64 (AArch64), with CustomPiOS 2.0.0. ARM64 is the architecture
+for these boards; x64 refers to Intel/AMD systems.
+
+CustomPiOS 2.0 requires Python YAML support (`python3-yaml`) and an explicit
+`BASE_BOARD=raspberrypiarm64` so its generated board config retains ARM64
+emulation. RatOS keeps downloaded images in `src/image` using
+`BASE_IMAGE_PATH`; the Raspberry Pi boot partition mounts at `/boot/firmware`.
+The upstream 2.0 polkit fix replaces the former checkout patch.
+
+The intended printer connection is a BTT Manta M8P V2.0 over USB.
+After flashing, select that board in the RatOS configurator and use its
+`/dev/serial/by-id/` device for Klipper. No CAN interface setup is added by
+this migration. Printer wiring and MCU firmware still need to match USB mode.
+
 ## HUGE THANK YOU to the Sponsors
 
 ![Rat Rig](sponsors/ratrig-logo.png)
