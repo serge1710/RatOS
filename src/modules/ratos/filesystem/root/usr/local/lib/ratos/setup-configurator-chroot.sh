@@ -46,7 +46,11 @@ EOF
 # v2.1.3's version checker and extensions require its pinned RatOS Klipper fork.
 # Upstream's script reads the pin from this configurator's moonraker.conf.
 export KLIPPER_DIR="${TARGET_HOME}/klipper" KLIPPER_ENV="${TARGET_HOME}/klippy-env"
-bash "${REPO_DIR}/configuration/scripts/klipper-fork-migration.sh"
+# Run Git directly as the target user: upstream captures stderr with the URL,
+# so chroot sudo hostname warnings would corrupt repository detection.
+chown -R "${TARGET_USER}:${TARGET_USER}" "${KLIPPER_DIR}"
+runuser -u "${TARGET_USER}" -- bash \
+    "${REPO_DIR}/configuration/scripts/klipper-fork-migration.sh" --skip-ownership
 # Refresh dependencies and chelper after switching from upstream Klipper.
 runuser -u "${TARGET_USER}" -- "${KLIPPER_ENV}/bin/python" -m pip install \
     -r "${KLIPPER_DIR}/scripts/klippy-requirements.txt" pygam
