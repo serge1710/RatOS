@@ -49,6 +49,9 @@ export KLIPPER_DIR="${TARGET_HOME}/klipper" KLIPPER_ENV="${TARGET_HOME}/klippy-e
 # Run Git directly as the target user: upstream captures stderr with the URL,
 # so chroot sudo hostname warnings would corrupt repository detection.
 chown -R "${TARGET_USER}:${TARGET_USER}" "${KLIPPER_DIR}"
+# Ownership changes invalidate Git stat data. Refresh it without discarding edits;
+# the upstream migration uses diff-index, which does not refresh the index.
+runuser -u "${TARGET_USER}" -- git -C "${KLIPPER_DIR}" update-index --refresh
 runuser -u "${TARGET_USER}" -- bash \
     "${REPO_DIR}/configuration/scripts/klipper-fork-migration.sh" --skip-ownership
 # Refresh dependencies and chelper after switching from upstream Klipper.
