@@ -70,6 +70,16 @@ After flashing, select that board in the RatOS configurator and use its
 `/dev/serial/by-id/` device for Klipper. No CAN interface setup is added by
 this migration. Printer wiring and MCU firmware still need to match USB mode.
 
+The image installs pnpm 9.14.2 and keeps a systemd drop-in that launches
+its JavaScript entry point through Node. The entry point is resolved from
+npm's global module directory at startup. During configurator setup, the
+image runs the bundled Klipper fork migration and uses the commit pinned
+in that configurator's `configuration/moonraker.conf`, then refreshes the
+Klipper Python dependencies (including pyGAM) and C helper. This keeps the
+host compatible with the firmware checker and RatOS extensions. Use the
+configurator to flash matching USB firmware onto the Manta; the image build
+does not flash attached hardware.
+
 ## HUGE THANK YOU to the Sponsors
 
 ![Rat Rig](sponsors/ratrig-logo.png)

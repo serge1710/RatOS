@@ -32,3 +32,24 @@ export RATOS_PRINTER_DATA_DIR="${TARGET_HOME}/printer_data"
 npm install -g pnpm@9.14.2
 bash "${TMP_SETUP}"
 chown -R "${TARGET_USER}:${TARGET_USER}" "${REPO_DIR}" "${TARGET_HOME}/printer_data"
+
+# Keep the service correction in a drop-in so configurator updates retain it.
+PNPM_SCRIPT="$(npm root -g)/pnpm/bin/pnpm.cjs"
+test "$(/usr/bin/node "${PNPM_SCRIPT}" --version)" = "9.14.2"
+install -d /etc/systemd/system/ratos-configurator.service.d
+cat > /etc/systemd/system/ratos-configurator.service.d/override.conf <<'EOF'
+[Service]
+ExecStart=
+ExecStart=/bin/bash /usr/local/lib/ratos/start-configurator.sh
+EOF
+
+# v2.1.3's version checker and extensions require its pinned RatOS Klipper fork.
+# Upstream's script reads the pin from this configurator's moonraker.conf.
+export KLIPPER_DIR="${TARGET_HOME}/klipper" KLIPPER_ENV="${TARGET_HOME}/klippy-env"
+bash "${REPO_DIR}/configuration/scripts/klipper-fork-migration.sh"
+# Refresh dependencies and chelper after switching from upstream Klipper.
+runuser -u "${TARGET_USER}" -- "${KLIPPER_ENV}/bin/python" -m pip install \
+    -r "${KLIPPER_DIR}/scripts/klippy-requirements.txt" pygam
+runuser -u "${TARGET_USER}" -- "${KLIPPER_ENV}/bin/python" -c "import pygam"
+runuser -u "${TARGET_USER}" -- "${KLIPPER_ENV}/bin/python" \
+    "${KLIPPER_DIR}/klippy/chelper/__init__.py"
