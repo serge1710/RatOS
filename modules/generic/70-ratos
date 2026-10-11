@@ -1,0 +1,178 @@
+#!/usr/bin/env bash
+# Installs RatOS
+# GPL V3
+########
+
+# Source error handling, leave this in place
+set -Ee
+
+# Set DEBIAN_FRONTEND to noninteractive
+if [[ "${DEBIAN_FRONTEND}" != "noninteractive" ]]; then
+    export DEBIAN_FRONTEND=noninteractive
+fi
+
+# shellcheck source=/dev/null
+source /common.sh
+source /files/00-config
+install_cleanup_trap
+
+echo_green "Installing RatOS"
+
+apt-get install --yes python3-serial python3-opencv curl git
+runuser -u "${BASE_USER}" -- git clone --depth 1 --branch v2.1.3 \
+    https://github.com/Rat-OS/RatOS-configurator.git "/home/${BASE_USER}/ratos-configurator"
+runuser -u "${BASE_USER}" -- git clone --depth 1 --branch v2.1.x \
+    https://github.com/Rat-OS/RatOS-theme.git "/home/${BASE_USER}/printer_data/config/.theme"
+cp -a /files/ratos/root/. /
+export DIST_VERSION="${RELEASE_TAG}"
+
+# Set default git merge strategy
+sudo -u "${BASE_USER}" git config --global pull.ff only
+
+# Create release file
+if [ -f "/etc/ratos_version" ]; then
+    sudo rm -f /etc/ratos_version
+fi
+function get_parent {
+    cat /etc/os-release | grep VERSION_CODENAME | cut -d '=' -f2
+}
+
+echo "${DIST_NAME} v${DIST_VERSION} ($(get_parent))" > "/etc/${DIST_NAME,,}-release"
+
+
+## Step 2: Fake release file
+### NOTE: Turns out that the 'distro' python package,
+###       which is used by moonraker, uses the first file after sorting.
+###       Therefore we need a hacky solution, because armbian relies, on upgrades
+###       on the original armbian-release file.
+###       To get around that, we simple symlink mainsailos-release to
+###       aaaa-release, which is directly read by moonraker.
+### Substep 1: Do for armbian releases
+if [[ -f "/etc/armbian-release" ]]; then
+    echo_green "Apply release file workaround (armbian based image) ..."
+    ln -s /etc/"${DIST_NAME,,}"-release /etc/aaaa-release
+fi
+### END Substep 1
+### Substep 2: Apply same for OrangePI based Images
+if [[ -f "/etc/orangepi-release" ]]; then
+    echo_green "Apply release file workaround (orangepi based image) ..."
+    ln -s /etc/"${DIST_NAME,,}"-release /etc/aaaa-release
+fi
+## END Step 2
+
+# Install RatOS Configurator
+bash /usr/local/lib/ratos/setup-configurator-chroot.sh \
+    "/home/${BASE_USER}/ratos-configurator" "${BASE_USER}"
+
+# Start the configurator so extensions can access the API
+echo "Starting RatOS Configurator"
+pushd "/home/${BASE_USER}/ratos-configurator/app"
+runuser -u "${BASE_USER}" -- env HOME="/home/${BASE_USER}" bash /usr/local/lib/ratos/start-configurator.sh &
+# Wait for configurator to start
+# shellcheck disable=SC2016
+timeout 300 bash -c 'while [[ "$(curl -s -o /dev/null -w ''%{http_code}'' localhost:3000)" != "404" ]]; do sleep 5; done' || false
+popd
+
+echo "RATOS CLI SANITY CHECKS"
+echo $PATH
+ls -la /usr/local/bin
+
+# Install RatOS Configuration
+# The v2.1.3 setup links RatOS to the monorepo's embedded configuration.
+# Run privileged installation as root and map the renamed Trixie OpenBLAS package.
+RATOS_INSTALL="/home/${BASE_USER}/ratos-configurator/configuration/scripts/ratos-install.sh"
+RATOS_BUILD_INSTALL="$(mktemp "$(dirname "${RATOS_INSTALL}")/.ratos-install.XXXXXX.sh")"
+# The image's target account may still have nologin until first boot.
+# Force Bash only for upstream su calls in this temporary build installer.
+sed -e '/source.*ratos-common.sh/a PKGLIST="${PKGLIST//libopenblas-base/libopenblas0}"' \
+    -e '/source.*ratos-common.sh/a su() { command su --shell /bin/bash "$@"; }' \
+    "${RATOS_INSTALL}" > "${RATOS_BUILD_INSTALL}"
+if env SUDO_USER="${BASE_USER}" HOME="/home/${BASE_USER}" USER="${BASE_USER}" \
+    RATOS_USERNAME="${BASE_USER}" RATOS_USERGROUP="${BASE_USER}" \
+    bash "${RATOS_BUILD_INSTALL}"; then
+    rm -f "${RATOS_BUILD_INSTALL}"
+else
+    RATOS_INSTALL_STATUS=$?
+    rm -f "${RATOS_BUILD_INSTALL}"
+    exit "${RATOS_INSTALL_STATUS}"
+fi
+
+
+# Service configuration must run as root: setuid sudo cannot escalate in
+# the image's nosuid chroot. Keep extension symlinking under the target user.
+if [[ -f /usr/lib/systemd/system/ModemManager.service ||
+      -f /lib/systemd/system/ModemManager.service ||
+      -f /etc/systemd/system/ModemManager.service ]]; then
+    systemctl disable ModemManager.service
+fi
+systemctl mask ModemManager.service
+
+KS_SERVICE=/etc/systemd/system/KlipperScreen.service
+if [[ -f "${KS_SERVICE}" ]]; then
+    sed -i -e 's/^RestartSec=1$/RestartSec=5/' \
+        -e 's/^StartLimitIntervalSec=0$/StartLimitIntervalSec=100\nStartLimitBurst=4/' \
+        "${KS_SERVICE}"
+fi
+
+POST_INSTALL="/home/${BASE_USER}/printer_data/config/RatOS/scripts/ratos-post-install.sh"
+POST_BUILD="$(mktemp "$(dirname "${POST_INSTALL}")/.ratos-post-build.XXXXXX.sh")"
+# Skip only the two privileged calls already handled above, preserving the
+# upstream user guard and symlink_extensions failure handling.
+sed -e '/^disable_modem_manager[[:space:]]*$/d' \
+    -e '/^patch_klipperscreen_service_restarts[[:space:]]*$/d' \
+    "${POST_INSTALL}" > "${POST_BUILD}"
+bash -n "${POST_BUILD}"
+chmod 0644 "${POST_BUILD}"
+if sudo -u "${BASE_USER}" env HOME="/home/${BASE_USER}" \
+    USER="${BASE_USER}" LOGNAME="${BASE_USER}" bash "${POST_BUILD}"; then
+    rm -f "${POST_BUILD}"
+else
+    POST_STATUS=$?
+    rm -f "${POST_BUILD}"
+    exit "${POST_STATUS}"
+fi
+
+# Stop the configurator, curl will fail so disable exit on error
+set +e
+echo "Stopping the configurator"
+curl 'http://localhost:3000/configure/api/trpc/kill' &> /dev/null
+# Re-enable exit on error
+set -e
+
+retries=0
+while [ "$(pgrep -f -c "ratos-configurator")" -gt 0 ]; do
+    if [ $retries -gt 10 ]; then
+        echo "Configurator did not stop, killing it..."
+        pkill -f "ratos-configurator"
+        if [ $retries -gt 12 ]; then
+            echo "Configurator cannot be killed.. :("
+            break
+        fi
+    fi
+    echo "Waiting for configurator to stop... ${retries}s passed"
+    sleep 1
+    retries=$((retries + 1))
+done
+
+echo "Configurator stopped.."
+
+if [ "$(pgrep -f -c "KlipperScreen")" -gt 0 ]; then
+    echo "Stopping KlipperScreen"
+    retries=0
+    while [ "$(pgrep -f -c "KlipperScreen")" -gt 0 ]; do
+        if [ $retries -gt 10 ]; then
+            echo "KlipperScreen did not stop, killing it..."
+            pkill -f "KlipperScreen"
+            if [ $retries -gt 12 ]; then
+                echo "KlipperScreen cannot be killed.. :("
+                break
+            fi
+        fi
+        echo "Waiting for KlipperScreen to stop... ${retries}s passed"
+        sleep 1
+        retries=$((retries + 1))
+    done
+fi
+
+echo "List out all running processes"
+ps aux
