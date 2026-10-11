@@ -55,8 +55,19 @@ runuser -u "${TARGET_USER}" -- git -C "${KLIPPER_DIR}" update-index --refresh
 runuser -u "${TARGET_USER}" -- bash \
     "${REPO_DIR}/configuration/scripts/klipper-fork-migration.sh" --skip-ownership
 # Refresh dependencies and chelper after switching from upstream Klipper.
+KLIPPER_REQUIREMENTS="${KLIPPER_DIR}/scripts/klippy-requirements.txt"
+if "${KLIPPER_ENV}/bin/python" -c 'import sys; sys.exit(sys.version_info < (3, 13))'; then
+    # The RatOS fork predates Python 3.13. Keep its source checkout clean and
+    # use a temporary requirements copy with compatible native dependencies.
+    TMP_CONFIG="$(mktemp /tmp/ratos-klippy-requirements.XXXXXX.txt)"
+    sed -E '/^(cffi|greenlet)==/d' "${KLIPPER_REQUIREMENTS}" > "${TMP_CONFIG}"
+    printf '\ncffi==2.1.1\ngreenlet==3.3.2\n' >> "${TMP_CONFIG}"
+    chmod 644 "${TMP_CONFIG}"
+    KLIPPER_REQUIREMENTS="${TMP_CONFIG}"
+fi
 runuser -u "${TARGET_USER}" -- "${KLIPPER_ENV}/bin/python" -m pip install \
-    -r "${KLIPPER_DIR}/scripts/klippy-requirements.txt" pygam
-runuser -u "${TARGET_USER}" -- "${KLIPPER_ENV}/bin/python" -c "import pygam"
+    -r "${KLIPPER_REQUIREMENTS}" pygam
+runuser -u "${TARGET_USER}" -- "${KLIPPER_ENV}/bin/python" -c \
+    'import pygam, cffi, greenlet; cffi.FFI(); assert greenlet.greenlet(lambda: 42).switch() == 42'
 runuser -u "${TARGET_USER}" -- "${KLIPPER_ENV}/bin/python" \
     "${KLIPPER_DIR}/klippy/chelper/__init__.py"
