@@ -64,6 +64,8 @@ fi
 bash /usr/local/lib/ratos/setup-configurator-chroot.sh \
     "/home/${BASE_USER}/ratos-configurator" "${BASE_USER}"
 
+/usr/local/lib/ratos/apply-networkmanager-compat.py "/home/${BASE_USER}/ratos-configurator"
+
 # Start the configurator so extensions can access the API
 echo "Starting RatOS Configurator"
 pushd "/home/${BASE_USER}/ratos-configurator/app"

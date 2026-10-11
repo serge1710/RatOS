@@ -39,9 +39,11 @@ test "$(/usr/bin/node "${PNPM_SCRIPT}" --version)" = "9.14.2"
 install -d /etc/systemd/system/ratos-configurator.service.d
 cat > /etc/systemd/system/ratos-configurator.service.d/override.conf <<'EOF'
 [Service]
+ExecStartPre=+/usr/local/lib/ratos/apply-networkmanager-compat.py @RATOS_REPO@
 ExecStart=
 ExecStart=/bin/bash /usr/local/lib/ratos/start-configurator.sh
 EOF
+sed -i "s|@RATOS_REPO@|${REPO_DIR}|g" /etc/systemd/system/ratos-configurator.service.d/override.conf
 
 # v2.1.3's version checker and extensions require its pinned RatOS Klipper fork.
 # Upstream's script reads the pin from this configurator's moonraker.conf.

@@ -33,3 +33,15 @@ the build uploads experimental images as Actions artifacts only.
 
 GitHub discussion #2473 could not be retrieved, so its content has not
 been applied. Crowsnest v5 was verified directly from the release tag.
+
+## Configurator networking
+
+RatOS v2.1.3 writes legacy wpa_supplicant.conf and uses wpa_cli status.
+This image adapts the existing five-argument Wi-Fi installer to a protected
+NetworkManager WPA2 profile and adapts the wizard connection-status command.
+Raw iw scanning remains available. The systemd ExecStartPre hook reapplies
+the adapter after configurator updates and fails on an unknown status bundle.
+Country, hidden SSIDs, DHCP and a requested single Wi-Fi band are supported;
+a mixed frequency list leaves band selection automatic. The original precise
+scan-frequency restriction is not transferred. No legacy dhcpcd or autohotspot
+stack is enabled. Test Wi-Fi joining and first-boot renaming on hardware.

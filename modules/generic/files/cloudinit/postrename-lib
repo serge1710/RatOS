@@ -180,11 +180,13 @@ fix_ratos_paths() {
     for f in /usr/local/etc/.ratos.env \
         "/home/${DEFAULT_USER}/.ratos.env.system" \
         "${repo}/app/.env" /etc/logrotate.d/ratos-configurator \
+        /etc/systemd/system/ratos-configurator.service.d/override.conf \
         /etc/sudoers.d/*ratos*; do
         [[ -f "${f}" ]] || continue
         sed -i "s|/home/${old}/|/home/${DEFAULT_USER}/|g; s|^${old}[[:space:]]|${DEFAULT_USER} |; s|=${old}$|=${DEFAULT_USER}|g" "${f}"
     done
     [[ -d "${repo}/configuration" ]] || return 0
+    /usr/local/lib/ratos/apply-networkmanager-compat.py "${repo}"
     ln -sfn "${repo}/configuration" "/home/${DEFAULT_USER}/printer_data/config/RatOS"
     ln -sfn "${repo}/app/bin/ratos" /usr/local/bin/ratos
     # Extension links were built with the original user's home.
