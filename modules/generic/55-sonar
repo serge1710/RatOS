@@ -63,3 +63,9 @@ popd &> /dev/null || exit 1
 ########################################
 
 systemctl_if_exists enable sonar.service
+
+# RatOS queries the log before Sonar necessarily writes its first entry.
+# Preserve existing contents and ensure the installer's log symlink resolves.
+touch /var/log/sonar.log
+chmod 0644 /var/log/sonar.log
+test -r "/home/${BASE_USER}/printer_data/logs/sonar.log"
