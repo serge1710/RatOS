@@ -161,6 +161,9 @@ jobs:
       - name: "🛠 Compressing Image"
         working-directory: ./build
         run: |
+          # CustoPiZer creates output.img as root inside its container.
+          # xz preserves owner/group metadata; make the runner own the image first.
+          sudo chown "$(id -u):$(id -g)" "${{ env.IMAGE }}"
           CPU_COUNT="$(nproc)"
           echo -e "\e[32mUsing ${CPU_COUNT} Cores for compression...\e[0m"
           xz -efkvz6T"${CPU_COUNT}" "${{ env.IMAGE }}"
