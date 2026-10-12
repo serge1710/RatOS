@@ -5,10 +5,12 @@ import os
 import pwd
 import re
 import sys
+import subprocess
 
 if os.geteuid() != 0:
     sys.exit('Must run as root')
 repo = Path(sys.argv[1]).resolve()
+subprocess.run(['/usr/local/lib/ratos/apply-trixie-compat.py', str(repo)], check=True)
 owner = pwd.getpwuid(repo.stat().st_uid).pw_name
 script = repo / 'app/scripts/add-wifi-network.sh'
 script.unlink(missing_ok=True)

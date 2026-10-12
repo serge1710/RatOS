@@ -66,6 +66,8 @@ bash /usr/local/lib/ratos/setup-configurator-chroot.sh \
 
 /usr/local/lib/ratos/apply-networkmanager-compat.py "/home/${BASE_USER}/ratos-configurator"
 
+/usr/local/lib/ratos/apply-trixie-compat.py "/home/${BASE_USER}/ratos-configurator" --install-components
+
 # Start the configurator so extensions can access the API
 echo "Starting RatOS Configurator"
 pushd "/home/${BASE_USER}/ratos-configurator/app"
