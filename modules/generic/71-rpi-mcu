@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+set -euo pipefail
+source /common.sh
+source /files/00-config
+/usr/local/lib/ratos/install-rpi-mcu.sh "${BASE_USER}"
+test -x /usr/local/bin/klipper_mcu
+test -f /etc/systemd/system/klipper_mcu.service
