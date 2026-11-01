@@ -45,3 +45,23 @@ Country, hidden SSIDs, DHCP and a requested single Wi-Fi band are supported;
 a mixed frequency list leaves band selection automatic. The original precise
 scan-frequency restriction is not transferred. No legacy dhcpcd or autohotspot
 stack is enabled. Test Wi-Fi joining and first-boot renaming on hardware.
+
+## KlipperScreen
+
+Module `72-klipperscreen` installs KlipperScreen with X11 and enables its
+service. The source for image installation is pinned to upstream commit
+`34610ceae31e12a10cc980e20a1dec9976f97dd4`; Moonraker tracks upstream master.
+The temporary root/chroot installer skips host VT probing, service startup,
+and NetworkManager installation. The normal upstream installer is retained.
+
+The October 31 CM5 display fix is applied before each service start: an Xorg
+Device/Screen configuration uses the modesetting driver and the display's
+KMS device (`/dev/dri/card1` on the tested CM5). Selection uses DRM display
+connectors rather than assuming the render-only GPU or a fixed card number.
+No Xorg display is started during image creation. Systems without a DRM card
+skip the service; display-specific rotation and touch calibration remain user
+settings. KlipperScreen joins the existing first-boot username/venv migration
+and appears in Moonraker's update and service managers.
+
+Build validation imports GTK/Python dependencies and verifies X11/VT service
+settings. Actual display/touch operation must still be checked on hardware.

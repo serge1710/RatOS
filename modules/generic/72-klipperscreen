@@ -1,0 +1,71 @@
+#!/usr/bin/env bash
+# KlipperScreen X11 integration for the Raspberry Pi ARM64 image.
+set -Eeuo pipefail
+source /common.sh
+source /files/00-config
+install_cleanup_trap
+
+KS_HOME="/home/${BASE_USER}"
+KS_DIR="${KS_HOME}/KlipperScreen"
+KS_VENV="${KS_HOME}/.KlipperScreen-env"
+# Pin the source used to build this image while retaining the upstream branch.
+KS_COMMIT=34610ceae31e12a10cc980e20a1dec9976f97dd4
+apt-get install --yes kbd xserver-xorg-core
+runuser -u "${BASE_USER}" -- git clone --depth 1 --branch master \
+    https://github.com/KlipperScreen/KlipperScreen.git "${KS_DIR}"
+runuser -u "${BASE_USER}" -- git -C "${KS_DIR}" fetch --depth 1 origin "${KS_COMMIT}"
+runuser -u "${BASE_USER}" -- git -C "${KS_DIR}" checkout -B master FETCH_HEAD
+
+# Adapt only a temporary installer: image builds run as root and have no VT.
+KS_INSTALL="${KS_DIR}/scripts/KlipperScreen-install.sh"
+grep -Fq 'if [ "$EUID" == 0 ]' "${KS_INSTALL}"
+KS_BUILD_INSTALL="$(mktemp "${KS_DIR}/scripts/.KlipperScreen-build.XXXXXX.sh")"
+trap 'rm -f "${KS_BUILD_INSTALL}"' EXIT
+sed -e '/^if \[ "\$EUID" == 0 \]/,/^fi$/d' \
+    -e '/^[[:space:]]*check_virtual_terminal[[:space:]]*$/d' \
+    -e '1a sudo() { "$@"; }' \
+    "${KS_INSTALL}" > "${KS_BUILD_INSTALL}"
+bash -n "${KS_BUILD_INSTALL}"
+env HOME="${KS_HOME}" USER="${BASE_USER}" LOGNAME="${BASE_USER}" \
+    KLIPPERSCREEN_VENV="${KS_VENV}" PIP_NO_CACHE_DIR=1 \
+    DEBIAN_FRONTEND=noninteractive SERVICE=Y BACKEND=X START=0 NETWORK=n \
+    bash "${KS_BUILD_INSTALL}" </dev/null
+
+for group in tty video render input; do
+    groupadd -f "${group}"
+    usermod -aG "${group}" "${BASE_USER}"
+done
+chown -R "${BASE_USER}:${BASE_USER}" "${KS_DIR}" "${KS_VENV}" "${KS_HOME}/.local"
+
+# Select the display's KMS card on the Pi, never using the build host's GPU.
+install -d -m 0755 /etc/systemd/system/KlipperScreen.service.d /etc/X11/xorg.conf.d
+cat > /etc/systemd/system/KlipperScreen.service.d/ratos.conf <<'EOF_SERVICE'
+[Unit]
+StartLimitIntervalSec=60
+StartLimitBurst=5
+ConditionPathExistsGlob=/dev/dri/card*
+
+[Service]
+ExecStartPre=+/usr/local/lib/ratos/klipperscreen-x11.py
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+EOF_SERVICE
+
+# Make the installed screen visible to Moonraker's service management.
+ASVC="${KS_HOME}/printer_data/moonraker.asvc"
+touch "${ASVC}"
+if ! grep -qxF KlipperScreen "${ASVC}"; then
+    printf '\nKlipperScreen\n' >> "${ASVC}"
+fi
+chown "${BASE_USER}:${BASE_USER}" "${ASVC}"
+
+# Fail the build on incomplete installs, without starting Xorg in the chroot.
+test -f "${KS_DIR}/screen.py"
+test -x "${KS_VENV}/bin/python"
+test -x /usr/bin/xinit
+grep -Fq 'BACKEND=X' /etc/systemd/system/KlipperScreen.service
+grep -Fq 'TTYPath=/dev/tty7' /etc/systemd/system/KlipperScreen.service
+"${KS_VENV}/bin/python" -c 'import gi; gi.require_version("Gtk", "3.0"); from gi.repository import Gtk; import requests, sdbus, websocket'
+runuser -u "${BASE_USER}" -- git -C "${KS_DIR}" rev-parse HEAD
+systemctl_if_exists enable KlipperScreen.service
